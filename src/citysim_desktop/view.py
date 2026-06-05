@@ -47,6 +47,22 @@ PLACE_COLORS = {
     "park": (110, 190, 120),
 }
 
+PLACE_LABELS = {
+    "home":     "Casa",
+    "business": "Emp.",
+    "school":   "Esc.",
+    "hospital": "Hosp.",
+    "shop":     "Tienda",
+    "park":     "Parque",
+}
+
+ACTION_COLORS = {
+    "work":      (235, 190,  60),   # amarillo — trabajando
+    "socialize": (180, 110, 230),   # violeta  — socializando
+    "rest":      ( 80, 140, 220),   # azul     — descansando
+    "consume":   ( 90, 200, 140),   # verde    — consumiendo
+}
+
 
 class Button:
     def __init__(self, rect: tuple[int, int, int, int], label: str, action) -> None:
@@ -108,6 +124,11 @@ class App:
         self.save_path = default_save_path()
         self.running = True
 
+        # --- Cámara: zoom y desplazamiento del lienzo del mundo ---
+        self._cam_offset: list[float] = [0.0, 0.0]
+        self._cam_scale: float = 1.0
+        self._pan_last: tuple[int, int] | None = None
+
         # Campos de la pantalla de creación.
         cx = WIDTH // 2 - 140
         self.fields = [
@@ -129,10 +150,12 @@ class App:
             n_households=self.fields[2].as_int(30),
             n_businesses=self.fields[3].as_int(20),
         )
+        self._reset_camera()
 
     def _do_load(self) -> None:
         if self.save_path.exists():
             self.ctrl.load(self.save_path)
+            self._reset_camera()
 
     def _do_save(self) -> None:
         self.ctrl.save(self.save_path)
@@ -165,8 +188,26 @@ class App:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self._handle_click(event.pos)
+            elif event.type == pygame.MOUSEWHEEL:
+                if self.ctrl.screen == SCREEN_WORLD:
+                    mx, my = pygame.mouse.get_pos()
+                    factor = 1.15 if event.y > 0 else 1.0 / 1.15
+                    self._zoom(mx, my, factor)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self._handle_click(event.pos)
+                elif event.button in (2, 3) and self.ctrl.screen == SCREEN_WORLD:
+                    self._pan_last = event.pos
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button in (2, 3):
+                    self._pan_last = None
+            elif event.type == pygame.MOUSEMOTION:
+                if self._pan_last is not None:
+                    dx = event.pos[0] - self._pan_last[0]
+                    dy = event.pos[1] - self._pan_last[1]
+                    self._cam_offset[0] += dx
+                    self._cam_offset[1] += dy
+                    self._pan_last = event.pos
             elif event.type == pygame.KEYDOWN:
                 self._handle_key(event)
 
@@ -196,8 +237,10 @@ class App:
         canvas_h = HEIGHT - BAR_H
         if x >= canvas_w or y >= canvas_h:
             return
+        # Invertir transformada de cámara para obtener coords del lienzo.
+        wx, wy = self._s2w(float(x), float(y))
         place_pos = layout.place_positions(state.places, canvas_w, canvas_h)
-        self.ctrl.select(layout.person_at(pos, state.persons, place_pos))
+        self.ctrl.select(layout.person_at((wx, wy), state.persons, place_pos))
 
     def _handle_key(self, event) -> None:
         if self.ctrl.screen == SCREEN_CREATE:
@@ -220,6 +263,37 @@ class App:
             self._do_load()
         elif event.key == pygame.K_ESCAPE:
             self.ctrl.select(None)
+        elif event.key == pygame.K_h:
+            self._reset_camera()
+
+    # --- Cámara --------------------------------------------------------------
+
+    def _w2s(self, x: float, y: float) -> tuple[int, int]:
+        """Coordenadas del lienzo → pantalla (aplica zoom y desplazamiento)."""
+        return (
+            int(x * self._cam_scale + self._cam_offset[0]),
+            int(y * self._cam_scale + self._cam_offset[1]),
+        )
+
+    def _s2w(self, x: float, y: float) -> tuple[float, float]:
+        """Coordenadas de pantalla → lienzo (inversa de la cámara)."""
+        return (
+            (x - self._cam_offset[0]) / self._cam_scale,
+            (y - self._cam_offset[1]) / self._cam_scale,
+        )
+
+    def _zoom(self, mx: int, my: int, factor: float) -> None:
+        """Aplica zoom centrado en el cursor (mx, my) en coords de pantalla."""
+        new_scale = max(0.2, min(8.0, self._cam_scale * factor))
+        f = new_scale / self._cam_scale
+        self._cam_scale = new_scale
+        self._cam_offset[0] = mx + (self._cam_offset[0] - mx) * f
+        self._cam_offset[1] = my + (self._cam_offset[1] - my) * f
+
+    def _reset_camera(self) -> None:
+        self._cam_offset[0] = 0.0
+        self._cam_offset[1] = 0.0
+        self._cam_scale = 1.0
 
     # --- Dibujo --------------------------------------------------------------
 
@@ -250,22 +324,41 @@ class App:
         canvas_w = WIDTH - PANEL_W
         canvas_h = HEIGHT - BAR_H
 
-        # --- Vista del barrio ---
+        # Acotar el dibujo al lienzo para que los elementos no invadan el panel.
+        self.screen.set_clip(pygame.Rect(0, 0, canvas_w, canvas_h))
+
         place_pos = layout.place_positions(state.places, canvas_w, canvas_h)
+        # Etiqueta solo visible a partir de cierto zoom para no saturar la vista alejada.
+        show_labels = self._cam_scale >= 0.6
         for place in state.places:
-            x, y = place_pos[place.id]
+            wx, wy = place_pos[place.id]
+            sx, sy = self._w2s(wx, wy)
             color = PLACE_COLORS.get(place.type, MUTED)
-            pygame.draw.rect(self.screen, color, pygame.Rect(int(x) - 9, int(y) - 9, 18, 18), border_radius=3)
+            pygame.draw.rect(self.screen, color, pygame.Rect(sx - 9, sy - 9, 18, 18), border_radius=3)
+            if show_labels:
+                prefix = PLACE_LABELS.get(place.type, place.type)
+                lbl = self.small.render(f"{prefix} {place.id}", True, color)
+                self.screen.blit(lbl, (sx - lbl.get_width() // 2, sy + 11))
         for person in state.persons:
-            x, y = layout.person_position(person, place_pos)
-            color = OK if person.alive else (90, 90, 100)
-            pygame.draw.circle(self.screen, color, (int(x), int(y)), 3)
+            wx, wy = layout.person_position(person, place_pos)
+            sx, sy = self._w2s(wx, wy)
+            if person.alive:
+                color = ACTION_COLORS.get(person.current_action or "", MUTED)
+            else:
+                color = (70, 70, 80)
+            pygame.draw.circle(self.screen, color, (sx, sy), 3)
+
+        self.screen.set_clip(None)
+
+        self._draw_legend()
 
         # Resalta e inspecciona a la persona seleccionada (si hay).
         selected = self.ctrl.selected_person()
         if selected is not None:
-            sx, sy = layout.person_position(selected, place_pos)
-            pygame.draw.circle(self.screen, ACCENT, (int(sx), int(sy)), 9, width=2)
+            wx, wy = layout.person_position(selected, place_pos)
+            sx, sy = self._w2s(wx, wy)
+            if 0 <= sx < canvas_w and 0 <= sy < canvas_h:
+                pygame.draw.circle(self.screen, ACCENT, (sx, sy), 9, width=2)
             self._draw_person_panel(selected, canvas_w)
         else:
             self._draw_event_panel(state, canvas_w)
@@ -371,6 +464,21 @@ class App:
 
         hint = self.small.render("ESC o clic en vacío: cerrar", True, MUTED)
         self.screen.blit(hint, (x, HEIGHT - BAR_H - 24))
+
+    def _draw_legend(self) -> None:
+        """Leyenda de colores de acción, esquina inferior izquierda del lienzo."""
+        labels = [
+            ("trabajo",     ACTION_COLORS["work"]),
+            ("socializar",  ACTION_COLORS["socialize"]),
+            ("descanso",    ACTION_COLORS["rest"]),
+            ("consumo",     ACTION_COLORS["consume"]),
+        ]
+        x0 = 10
+        y0 = HEIGHT - BAR_H - 14 - len(labels) * 16
+        for label, color in labels:
+            pygame.draw.circle(self.screen, color, (x0 + 5, y0 + 6), 5)
+            self.screen.blit(self.small.render(label, True, MUTED), (x0 + 14, y0 - 1))
+            y0 += 16
 
     def _draw_event_panel(self, state, canvas_w: int) -> None:
         panel = pygame.Rect(canvas_w, 0, PANEL_W, HEIGHT - BAR_H)

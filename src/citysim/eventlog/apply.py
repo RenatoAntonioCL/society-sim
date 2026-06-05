@@ -115,6 +115,15 @@ def _apply_action(world: World, event: Event) -> None:
         return
     action = event.payload["action"]
     person.current_action = action
+
+    # Mover a la persona a su lugar según la acción.
+    if action == "work" and person.employer_id is not None:
+        person.location_id = person.employer_id
+    elif person.household_id is not None:
+        hh = world.households.get(person.household_id)
+        if hh is not None:
+            person.location_id = hh.dwelling_id
+
     d_energy, need, d_need = _ACTION_EFFECTS.get(action, (0.0, None, 0.0))
     person.energy = _clamp01(person.energy + d_energy)
     if need is not None:

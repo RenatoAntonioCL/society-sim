@@ -8,7 +8,29 @@ development, the version stays in `0.x` and the API is considered unstable.
 
 ## [Unreleased]
 
+### Fixed
+- **Agent mobility in the desktop view**: agents were always rendered at their home
+  position regardless of their current action. `eventlog/apply.py` — `_apply_action`
+  now updates `Person.location_id` when applying `ACTION_CHOSEN`: workers move to their
+  `employer_id`; all others return to their household dwelling. Dots now migrate between
+  places each tick.
+
 ### Added
+- **Desktop client — camera: pan and zoom**: the neighborhood canvas had no navigation.
+  Added camera state (`_cam_offset`, `_cam_scale`) to `App`:
+  - **Scroll wheel / trackpad**: zoom centered on the cursor (range 0.2×–8.0×, step 15%).
+  - **Right or middle mouse button + drag**: pan the canvas freely.
+  - **H key**: reset camera to the default view.
+  All draw calls go through `_w2s()` (world → screen) and clicks through `_s2w()`
+  (screen → world), so selection hit-testing stays correct at any zoom level. Canvas is
+  clipped to prevent elements from bleeding into the side panel.
+- **Desktop client — agent color by action**: all live agents were the same green dot.
+  Each action now has a distinct color: work = yellow, socialize = violet, rest = blue,
+  consume = green; dead agents = dark grey. A small legend is rendered in the lower-left
+  corner of the canvas.
+- **Desktop client — place labels**: each place square now shows its type and id
+  (e.g. "Casa 3", "Emp. 7") centered below it, in the place's own color. Labels are
+  hidden below 0.6× zoom to avoid clutter at the default view. **55 green tests total.**
 - **Desktop client — person inspection panel**: click an agent to inspect it. The
   right panel shows the person's state (wellbeing, health, energy), the five traits
   and the five needs as color-coded `[0,1]` bars, plus age, money and current action;
@@ -24,7 +46,6 @@ development, the version stays in `0.x` and the API is considered unstable.
   (`MemoryTraceDTO`) and `goals` (`GoalDTO`). The inspection panel uses them: a bipolar
   **Ánimo** meter (`[-1,1]`) and an **Objetivos** section with active goals + progress.
   - 1 new facade test (emotion matches the pure function; memory/goals form over a run).
-    **55 green tests total.**
 
 ## [0.3.0-alpha] — 2026-06-02
 
