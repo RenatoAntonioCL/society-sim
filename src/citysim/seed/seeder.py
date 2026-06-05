@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from ..config import SimConfig
 from ..rng import Rng
-from ..state.enums import PlaceType
+from ..state.enums import PlaceType, RelType
 from ..state.household import Household
 from ..state.person import Person, Traits
 from ..state.place import Place
+from ..state.relationship import Relationship
 from ..state.world import World
 from ..systems.base import clamp01
 
@@ -105,5 +106,70 @@ def seed_world(config: SimConfig) -> World:
                     person.employer_id = bid
                     slots[bid] -= 1
                     break
+
+    # --- Relaciones iniciales (Semana 4) ---
+    rel_rng = Rng(config.seed).derive("seeder_relations")
+    rel_id = 0
+
+    # Familia: todos los pares dentro de cada hogar (vínculo fuerte)
+    for hh in world.households.values():
+        members = hh.member_ids
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                world.relationships[rel_id] = Relationship(
+                    id=rel_id,
+                    a_id=members[i],
+                    b_id=members[j],
+                    type=RelType.FAMILY,
+                    strength=rel_rng.uniform(0.65, 0.95),
+                    reciprocity=rel_rng.uniform(0.70, 1.00),
+                )
+                rel_id += 1
+
+    # Trabajo: pares de colegas en la misma empresa (vínculo moderado, round-robin)
+    employees_by_biz: dict[int, list[int]] = {}
+    for pid, person in world.persons.items():
+        if person.employer_id is not None:
+            employees_by_biz.setdefault(person.employer_id, []).append(pid)
+    for emps in employees_by_biz.values():
+        shuffled = list(emps)
+        rel_rng.shuffle(shuffled)
+        for i in range(0, len(shuffled) - 1, 2):
+            world.relationships[rel_id] = Relationship(
+                id=rel_id,
+                a_id=shuffled[i],
+                b_id=shuffled[i + 1],
+                type=RelType.WORK,
+                strength=rel_rng.uniform(0.30, 0.55),
+                reciprocity=rel_rng.uniform(0.40, 0.70),
+            )
+            rel_id += 1
+
+    # Amistades aleatorias (vínculo débil/moderado, hasta 80 pares únicos)
+    existing_pairs: set[tuple[int, int]] = {
+        (min(r.a_id, r.b_id), max(r.a_id, r.b_id))
+        for r in world.relationships.values()
+    }
+    pid_list = list(world.persons.keys())
+    for _ in range(80):
+        a_id = rel_rng.choice(pid_list)
+        b_id = rel_rng.choice(pid_list)
+        if a_id == b_id:
+            continue
+        pair = (min(a_id, b_id), max(a_id, b_id))
+        if pair in existing_pairs:
+            continue
+        world.relationships[rel_id] = Relationship(
+            id=rel_id,
+            a_id=a_id,
+            b_id=b_id,
+            type=RelType.FRIEND,
+            strength=rel_rng.uniform(0.20, 0.55),
+            reciprocity=rel_rng.uniform(0.30, 0.65),
+        )
+        existing_pairs.add(pair)
+        rel_id += 1
+
+    world.next_relationship_id = rel_id
 
     return world

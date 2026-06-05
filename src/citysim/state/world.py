@@ -32,6 +32,9 @@ class World:
     # Dinero total al sembrar: baseline del invariante de conservación de dinero (Semana 2).
     initial_money_total: float = 0.0
 
+    # Próximo id disponible para Relationship (Semana 4).
+    next_relationship_id: int = 0
+
     # --- Accesos de conveniencia (lectura) ---
 
     def living_persons(self) -> list[Person]:

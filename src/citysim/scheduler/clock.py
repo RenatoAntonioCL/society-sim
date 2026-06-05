@@ -14,7 +14,7 @@ from ..rng import Rng
 from ..state.enums import EventType, TimeScale
 from ..state.event import Event
 from ..state.world import World
-from ..systems import aging, decision, economy, goals, memory, needs, wellbeing
+from ..systems import aging, contagion, death, decision, economy, goals, memory, needs, relations, wellbeing
 from ..systems.base import SystemSpec, TickContext
 
 
@@ -32,6 +32,9 @@ def build_default_registry() -> list[SystemSpec]:
         economy.SPEC,
         memory.SPEC,
         goals.SPEC,
+        relations.SPEC,
+        contagion.SPEC,
+        death.SPEC,
     ]
 
 
@@ -76,7 +79,7 @@ class Scheduler:
 
         for scale in _scales_for(hour, day_boundary, month_boundary):
             for spec in self._active_systems(scale):
-                ctx = TickContext(tick=next_tick, scale=scale, rng=self.rng.derive(spec.name))
+                ctx = TickContext(tick=next_tick, scale=scale, rng=self.rng.derive(f"{spec.name}_{next_tick}"))
                 events = spec.fn(world, ctx)
                 log.commit(world, events)
 
