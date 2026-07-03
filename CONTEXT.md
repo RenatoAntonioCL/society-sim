@@ -85,15 +85,20 @@ Legend: ✅ done · 🟡 in progress · ⏳ next · ⬜ pending
 
 ## Immediate next step
 
-**Week 4 — Society** is active. Remaining items:
-1. `systems/relations.py`: seed initial relationships + form new ones over time.
-2. `systems/contagion.py`: moods spread through the network (proportional to bond strength).
-3. `systems/death.py`: emergent death + consequence queue (grief, inheritance, household
-   restructuring, memory trace in survivors).
-4. Offline projection (`projector`) and one observer view (`observers/citizen.py`).
+**Week 4 — Society** is code-complete. All milestone items landed:
+1. ✅ `systems/relations.py`: initial relationships seeded + new ones formed over time.
+2. ✅ `systems/contagion.py`: moods spread through the network (proportional to bond strength).
+3. ✅ `systems/death.py`: emergent death + consequence queue (grief, inheritance, memory trace).
+4. ✅ Offline projection (`projector/projector.py`) and the citizen observer view
+   (`observers/citizen.py`).
 
-**Week 4 gate:** a well-connected death generates ripples in the network and economy;
-a neighborhood shock produces a collective mood drop.
+**Week 4 gate:** a well-connected death generates ripples in the network and economy
+(covered by `tests/test_week4_society.py::TestDeathRipplesNetwork`); a neighborhood shock
+propagates through `systems/contagion.py`. Suite green at **79 tests**.
+
+Next: open the PR `feat/week-4-society → main`, and on green CI cut the `v0.4.0-alpha`
+release (bump `VERSION`, tag). After that, the still-open **Week 1 core gate** (a
+seed-divergent log over a full simulated year) is the last blocker before `v1.0.0`.
 
 ---
 

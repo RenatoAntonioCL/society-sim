@@ -28,12 +28,22 @@ development, the version stays in `0.x` and the API is considered unstable.
     grief traces for bonds with strength ≥ 0.40.
   - **`eventlog/apply.py`**: three new appliers — `RELATIONSHIP_FORMED`,
     `RELATIONSHIP_CHANGED`, `INHERITANCE`.
+  - **`projector/projector.py`**: offline projection on reconnect — separates
+    deterministic processes (aging, clock advance, applied exactly over the jump) from
+    stochastic ones (death, sampled once over the interval with cumulative probability
+    `1-(1-p_daily)^days` rather than tick by tick). Mutates only through the eventlog.
+  - **`observers/citizen.py`**: first observer view — read-only `CitizenView.summary()`
+    projecting the world for one citizen across Work · Family · Transport.
   - **`scheduler/clock.py`**: registers the three new systems; fixes the static-RNG
     bug (derive key now includes the tick, so stochastic systems produce different
     draws each day while remaining deterministic for a given seed).
   - **`tests/test_week4_society.py`**: 12 gate tests — mortality curve, grief
     threshold (≥ 0.40 gets grief, < 0.40 does not), seed coverage, integration gate
-    (death → grief → contagion ripple). **67 green tests total.**
+    (death → grief → contagion ripple).
+  - **`tests/test_week4_projector_observer.py`**: 12 tests for the projector
+    (deterministic aging, clock jump, sampled mortality, no-op/negative guards) and the
+    citizen view (sections present, housemates exclude self/dead, bonds, transport).
+    **79 green tests total.**
 
 ### Fixed
 - **Agent mobility in the desktop view**: agents were always rendered at their home
