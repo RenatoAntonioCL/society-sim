@@ -9,6 +9,60 @@ development, the version stays in `0.x` and the API is considered unstable.
 ## [Unreleased]
 
 ### Added
+- **Week 4 — Society**: social network, contagion and emergent death.
+  - **`state/relationship.py`** — `Relationship` entity with `strength` and `reciprocity`
+    as first-class fields. `World` gains `next_relationship_id` and a
+    `relationships` index.
+  - **`seed/seeder.py`**: initial bonds seeded deterministically — family pairs
+    (strength 0.65–0.95), work colleague pairs (0.30–0.55) and up to 80 random
+    friendships (0.20–0.55).
+  - **`systems/relations.py`** (daily, order 10): new bonds form when two persons share
+    a location; formation probability 2.5%; emits `RELATIONSHIP_FORMED`.
+  - **`systems/contagion.py`** (daily, order 28): weighted-average neighbor emotion
+    is injected as a `"social_influence"` `MemoryTrace` when the cluster signal
+    exceeds 0.15; decays naturally through the existing emotion pipeline.
+  - **`systems/death.py`** (population scale, order 20): daily mortality probability
+    driven by age (exponential above 60) and health (up to 3× multiplier, capped at
+    25%/day). Two-pass: collects all dying persons first, then emits `DEATH`,
+    `INHERITANCE` (money split among living household members) and `MEMORY_UPDATED`
+    grief traces for bonds with strength ≥ 0.40.
+  - **`eventlog/apply.py`**: three new appliers — `RELATIONSHIP_FORMED`,
+    `RELATIONSHIP_CHANGED`, `INHERITANCE`.
+  - **`projector/projector.py`**: offline projection on reconnect — separates
+    deterministic processes (aging, clock advance, applied exactly over the jump) from
+    stochastic ones (death, sampled once over the interval with cumulative probability
+    `1-(1-p_daily)^days` rather than tick by tick). Mutates only through the eventlog.
+  - **`observers/citizen.py`**: first observer view — read-only `CitizenView.summary()`
+    projecting the world for one citizen across Work · Family · Transport.
+  - **`scheduler/clock.py`**: registers the three new systems; fixes the static-RNG
+    bug (derive key now includes the tick, so stochastic systems produce different
+    draws each day while remaining deterministic for a given seed).
+  - **`tests/test_week4_society.py`**: 12 gate tests — mortality curve, grief
+    threshold (≥ 0.40 gets grief, < 0.40 does not), seed coverage, integration gate
+    (death → grief → contagion ripple).
+  - **`tests/test_week4_projector_observer.py`**: 12 tests for the projector
+    (deterministic aging, clock jump, sampled mortality, no-op/negative guards) and the
+    citizen view (sections present, housemates exclude self/dead, bonds, transport).
+    **79 green tests total.**
+
+### Fixed
+- **Agent mobility in the desktop view**: agents were always rendered at their home
+  position regardless of their current action. `eventlog/apply.py` — `_apply_action`
+  now updates `Person.location_id` when applying `ACTION_CHOSEN`: workers move to their
+  `employer_id`; all others return to their household dwelling. Dots now migrate between
+  places each tick.
+- **Static RNG per tick** (`scheduler/clock.py`): `rng.derive(spec.name)` produced
+  the same sub-seed every tick because the XOR was static. Fixed by deriving
+  `f"{spec.name}_{tick}"` so each tick gets a unique sub-stream.
+
+### Added (desktop)
+- **Desktop client — camera: pan and zoom**: scroll wheel (zoom 0.2×–8.0×), right/
+  middle-click drag (pan), H key (reset). All draw calls go through `_w2s()` /
+  `_s2w()`, so selection hit-testing stays correct at any zoom level.
+- **Desktop client — agent color by action**: work = yellow, socialize = violet,
+  rest = blue, consume = green; dead = dark grey. Legend in the lower-left corner.
+- **Desktop client — place labels**: type + id below each place square (e.g. "Casa 3",
+  "Emp. 7"), hidden below 0.6× zoom.
 - **Desktop client — person inspection panel**: click an agent to inspect it. The
   right panel shows the person's state (wellbeing, health, energy), the five traits
   and the five needs as color-coded `[0,1]` bars, plus age, money and current action;
@@ -24,7 +78,6 @@ development, the version stays in `0.x` and the API is considered unstable.
   (`MemoryTraceDTO`) and `goals` (`GoalDTO`). The inspection panel uses them: a bipolar
   **Ánimo** meter (`[-1,1]`) and an **Objetivos** section with active goals + progress.
   - 1 new facade test (emotion matches the pure function; memory/goals form over a run).
-    **55 green tests total.**
 
 ## [0.3.0-alpha] — 2026-06-02
 

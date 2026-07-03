@@ -23,7 +23,7 @@ milestones continue from `v0.2.0-alpha`.
 | `v0.1.0`       | Downloadable platform         | Desktop app: facade + Pygame client + executables (Win/Mac/Linux) | ✅ Done |
 | `v0.2.0-alpha` | Identity (Wk. 2)             | Do agents look distinct from each other?                      | ✅ Done |
 | `v0.3.0-alpha` | Trajectory (Wk. 3)           | Does the past weigh in? Is there credible irrationality?      | ✅ Done |
-| `v0.4.0-alpha` | Society (Wk. 4)              | Does the network react to a death / shock?                    | ⬜ Pending |
+| `v0.4.0-alpha` | Society (Wk. 4)              | Does the network react to a death / shock?                    | 🟡 Gate passed, release pending |
 | `v1.0.0`       | Closed MVP                   | All 4 gates passed: one reproducible, non-flat year           | ⬜ Pending |
 
 Legend: ✅ done · 🟡 in progress · ⬜ pending
@@ -81,12 +81,12 @@ Past lived experience changes the present, with credible irrationality.
 
 Actions ripple through the network and death carries weight.
 
-- [ ] `Relationship` with type, strength, reciprocity and history.
-- [ ] Social contagion through the network, proportional to bond strength.
-- [ ] Emergent death system + consequence queue (grief, inheritance, household, trace).
-- [ ] Offline projection (deterministic vs stochastic).
-- [ ] One observer view (Citizen or Analyst).
-- [ ] **Gate:** a well-connected death generates ripples in the network and economy;
+- [x] `Relationship` with type, strength, reciprocity and history.
+- [x] Social contagion through the network, proportional to bond strength.
+- [x] Emergent death system + consequence queue (grief, inheritance, household, trace).
+- [x] Offline projection (deterministic vs stochastic).
+- [x] One observer view (Citizen or Analyst).
+- [x] **Gate:** a well-connected death generates ripples in the network and economy;
       a neighborhood shock produces a collective mood drop.
 
 ## v1.0.0 — Closed MVP ⬜

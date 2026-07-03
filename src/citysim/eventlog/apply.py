@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from typing import Callable
 
-from ..state.enums import EventType
+from ..state.enums import EventType, RelType
 from ..state.event import Event
 from ..state.person import Goal, MemoryTrace
+from ..state.relationship import Relationship
 from ..state.world import World
 
 Applier = Callable[[World, Event], None]
@@ -115,6 +116,15 @@ def _apply_action(world: World, event: Event) -> None:
         return
     action = event.payload["action"]
     person.current_action = action
+
+    # Mover a la persona a su lugar según la acción.
+    if action == "work" and person.employer_id is not None:
+        person.location_id = person.employer_id
+    elif person.household_id is not None:
+        hh = world.households.get(person.household_id)
+        if hh is not None:
+            person.location_id = hh.dwelling_id
+
     d_energy, need, d_need = _ACTION_EFFECTS.get(action, (0.0, None, 0.0))
     person.energy = _clamp01(person.energy + d_energy)
     if need is not None:
@@ -199,3 +209,41 @@ def _apply_goal_abandoned(world: World, event: Event) -> None:
         intensity=0.6,
         age_ticks=0,
     ))
+
+
+# --- Aplicadores Semana 4 (sociedad) -----------------------------------------
+
+@applier(EventType.RELATIONSHIP_FORMED)
+def _apply_rel_formed(world: World, event: Event) -> None:
+    rel = Relationship(
+        id=event.payload["id"],
+        a_id=event.payload["a_id"],
+        b_id=event.payload["b_id"],
+        type=RelType(event.payload["type"]),
+        strength=event.payload["strength"],
+        reciprocity=event.payload["reciprocity"],
+    )
+    world.relationships[rel.id] = rel
+    if rel.id >= world.next_relationship_id:
+        world.next_relationship_id = rel.id + 1
+
+
+@applier(EventType.RELATIONSHIP_CHANGED)
+def _apply_rel_changed(world: World, event: Event) -> None:
+    rel = world.relationships.get(event.payload["id"])
+    if rel is None:
+        return
+    if "strength" in event.payload:
+        rel.strength = _clamp01(event.payload["strength"])
+    if "reciprocity" in event.payload:
+        rel.reciprocity = _clamp01(event.payload["reciprocity"])
+
+
+@applier(EventType.INHERITANCE)
+def _apply_inheritance(world: World, event: Event) -> None:
+    deceased = world.persons.get(event.payload["from_id"])
+    heir = world.persons.get(event.payload["heir_id"])
+    amount = event.payload["amount"]
+    if deceased is not None and heir is not None and heir.alive:
+        deceased.money -= amount
+        heir.money += amount
